@@ -62,6 +62,7 @@ void search_command_path(char *args[]) {
       return;
     }
   }
+  raise_error();
   // fprintf(stderr, "Command not found in PATH\n");
 }
 
@@ -82,7 +83,7 @@ void handle_redirect(char **args, int num_args) {
 
     // there must be a filename after '>' and no extra args
     if (redirect_index != num_args - 3) {
-      fprintf(stderr, "Syntax error: Invalid redirection format.\n");
+      // fprintf(stderr, "Syntax error: Invalid redirection format.\n");
       raise_error();
       exit(1);
     }
@@ -120,8 +121,12 @@ pid_t exec_ext_command(char *args[], int num_args) {
     if (!is_path_command(args[0])) {
       search_command_path(args);
     }
+    // for (int i = 0; i < num_args; i++) {
+    //   printf("%s ", args[i]);
+    // }
+    // printf("\n");
     if (execv(args[0], args) == -1) {
-      perror(args[0]);
+      // perror(args[0]);
       raise_error();
     }
     exit(1);
@@ -141,6 +146,7 @@ int main(int argc, char *argv[]) {
   ssize_t read_size;
 
   // printf("Welcome to rush shell!\n");
+  setenv("PATH", "/bin", 1);
 
   while (1) {
     printf("%s> ", shell_name);
@@ -191,6 +197,7 @@ int main(int argc, char *argv[]) {
           num_pids++;
         }
 
+        // reset for next command
         num_args = 0;
       }
 
