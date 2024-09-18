@@ -62,7 +62,7 @@ int search_command_path(char *args[]) {
     strcat(command_path, "/");
     strcat(command_path, args[0]);
     if (access(command_path, X_OK) == 0) {
-      args[0] = command_path;
+      // args[0] = command_path;
       // printf("Found command at %s\n", command_path);
       return 1;
     }
@@ -74,12 +74,16 @@ int search_command_path(char *args[]) {
 // TODO: is this the best way?
 int is_path_command(char *command) { return strchr(command, '/') != NULL; }
 
-void handle_redirect(char **args, int num_args) {
+int handle_redirect(char **args, int num_args) {
   int redirect_index = -1;
   for (int i = 0; i < num_args - 1; i++) {
     if (strcmp(args[i], ">") == 0) {
+      if (redirect_index != -1) {
+        // fprintf(stderr, "Syntax error: Multiple redirections.\n");
+        raise_error();
+        return 0;
+      }
       redirect_index = i;
-      break;
     }
   }
 
@@ -87,27 +91,30 @@ void handle_redirect(char **args, int num_args) {
     // printf("Redirect index: %d. Num args: %d\n", redirect_index, num_args);
 
     // there must be a filename after '>' and no extra args
-    if (redirect_index != num_args - 3) {
+    if (redirect_index == 0 || redirect_index == num_args - 2) {
       // fprintf(stderr, "Syntax error: Invalid redirection format.\n");
       raise_error();
-      exit(1);
+      return 0;
     }
 
     // open the file for writing (clear content if exists, create if not)
-    // printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
+    // printf("Opening file %s\n", args[redirect_index + 1]);
     int fd = open(args[redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
       // fprintf(stderr, "Error opening file %s\n", args[redirect_index + 1]);
       raise_error();
-      exit(1);
+      return 0;
+      // exit(1);
     }
 
     // redirect
+    // printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
     if (dup2(fd, STDOUT_FILENO) == -1) {
       // fprintf(stderr, "Error redirecting stdout\n");
       raise_error();
       close(fd);
-      exit(1);
+      return 0;
+      // exit(1);
     }
 
     close(fd);
@@ -115,34 +122,48 @@ void handle_redirect(char **args, int num_args) {
     // remove all tokens starting from the redirection index
     args[redirect_index] = NULL;
   }
-}
 
-pid_t exec_command(char *args[], int num_args) {
-  pid_t pid = fork();
-  if (pid < 0) {
-    // fprintf(stderr, "Error forking process\n");
-    raise_error();
-    exit(1);
-  } else if (pid == 0) {
-    if (execv(args[0], args) == -1) {
-      // fprintf(stderr, "Error executing command %s\n", args[0]);
-      raise_error();
-    }
-    exit(1);
-  }
-  return pid;
+  return 1;
 }
 
 pid_t exec_ext_command(char *args[], int num_args) {
-  handle_redirect(args, num_args);
+  if (!handle_redirect(args, num_args)) {
+    return -1;
+  }
   // if path command --> assume it exists
-  int path_found = is_path_command(args[0]) || search_command_path(args);
-  if (!path_found) {
-    // fprintf(stderr, "Command not found\n");
+  if (is_path_command(args[0])) {
+    pid_t pid = fork();
+    if (pid < 0) {
+      // fprintf(stderr, "Error forking process\n");
+      raise_error();
+      // exit(1);
+    } else if (pid == 0) {
+      if (execv(args[0], args) == -1) {
+        // fprintf(stderr, "Error executing command %s\n", args[0]);
+        raise_error();
+      }
+      exit(1);
+    }
+    return pid;
+  } else if (search_command_path(args)) {
+    pid_t pid = fork();
+    if (pid < 0) {
+      // fprintf(stderr, "Error forking process\n");
+      raise_error();
+      // exit(1);
+    } else if (pid == 0) {
+      if (execvp(args[0], args) == -1) {
+        // fprintf(stderr, "Error executing command %s\n", args[0]);
+        raise_error();
+      }
+      exit(1);
+    }
+    return pid;
+  } else {
+    // fprintf(stderr, "Command not found in PATH\n");
     raise_error();
     return -1;
   }
-  return exec_command(args, num_args);
 }
 
 int main(int argc, char *argv[]) {
