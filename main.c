@@ -19,8 +19,8 @@ struct proc {
 char **get_tokens(char *string, int *num_tokens) {
   char **tokens = malloc(BUFFER_SIZE * sizeof(char *));
   if (tokens == NULL) {
-    fprintf(stderr, "Input buffer memory allocation failed\n");
-    // raise_error();
+    // fprintf(stderr, "Input buffer memory allocation failed\n");
+    raise_error();
     exit(1);
   }
   int current_buffer_size = BUFFER_SIZE;
@@ -49,8 +49,8 @@ void search_command_path(char *args[]) {
   char *path = getenv("PATH");
   printf("%s: %s\n", "PATH", path);
   if (path == NULL) {
-    fprintf(stderr, "PATH environment variable not set\n");
-    // raise_error();
+    // fprintf(stderr, "PATH environment variable not set\n");
+    raise_error();
     return;
   }
   char *path_token = NULL;
@@ -68,8 +68,8 @@ void search_command_path(char *args[]) {
       return;
     }
   }
-  // raise_error();
-  fprintf(stderr, "Command not found in PATH\n");
+  raise_error();
+  // fprintf(stderr, "Command not found in PATH\n");
 }
 
 // TODO: is this the best way?
@@ -89,8 +89,8 @@ void handle_redirect(char **args, int num_args) {
 
     // there must be a filename after '>' and no extra args
     if (redirect_index != num_args - 3) {
-      fprintf(stderr, "Syntax error: Invalid redirection format.\n");
-      // raise_error();
+      // fprintf(stderr, "Syntax error: Invalid redirection format.\n");
+      raise_error();
       exit(1);
     }
 
@@ -98,16 +98,15 @@ void handle_redirect(char **args, int num_args) {
     // printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
     int fd = open(args[redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
-      fprintf(stderr, "Error opening file %s for writing\n",
-              args[redirect_index + 1]);
-      // raise_error();
+      // fprintf(stderr, "Error opening file %s\n", args[redirect_index + 1]);
+      raise_error();
       exit(1);
     }
 
     // redirect
     if (dup2(fd, STDOUT_FILENO) == -1) {
-      fprintf(stderr, "Error redirecting stdout\n");
-      // raise_error();
+      // fprintf(stderr, "Error redirecting stdout\n");
+      raise_error();
       close(fd);
       exit(1);
     }
@@ -122,21 +121,21 @@ void handle_redirect(char **args, int num_args) {
 pid_t exec_ext_command(char *args[], int num_args) {
   pid_t pid = fork();
   if (pid < 0) {
-    printf("Fork failed\n");
-    // raise_error();
+    // fprintf(stderr, "Error forking process\n");
+    raise_error();
     exit(1);
   } else if (pid == 0) {
     handle_redirect(args, num_args);
-    if (!is_path_command(args[0])) {
-      search_command_path(args);
-    }
+    // if (!is_path_command(args[0])) {
+    //   search_command_path(args);
+    // }
     // for (int i = 0; i < num_args; i++) {
     //   printf("%s ", args[i]);
     // }
     // printf("\n");
-    if (execv(args[0], args) == -1) {
-      perror(args[0]);
-      // raise_error();
+    if (execvp(args[0], args) == -1) {
+      // fprintf(stderr, "Error executing command %s\n", args[0]);
+      raise_error();
     }
     exit(1);
   }
@@ -145,8 +144,8 @@ pid_t exec_ext_command(char *args[], int num_args) {
 
 int main(int argc, char *argv[]) {
   if (argc > 1) {
-    fprintf(stderr, "Usage: %s\n", argv[0]);
-    // raise_error();
+    // fprintf(stderr, "Usage: %s\n", argv[0]);
+    raise_error();
     exit(1);
   }
 
@@ -164,8 +163,8 @@ int main(int argc, char *argv[]) {
 
     read_size = getline(&string, &buffer_size, stdin);
     if (read_size == -1) {
-      fprintf(stderr, "Error reading input\n");
-      // raise_error();
+      // fprintf(stderr, "Error reading input\n");
+      raise_error();
       break;
     }
 
@@ -186,7 +185,7 @@ int main(int argc, char *argv[]) {
         }
         // only reach here if tokens[i] == "&" or i == num_tokens
         if (num_args == 0) {
-          fprintf(stderr, "& must be preceded by a command\n");
+          // fprintf(stderr, "& must be preceded by a command\n");
           // raise_error();
           break;
         }
@@ -218,9 +217,8 @@ int main(int argc, char *argv[]) {
       for (int i = 0; i < num_pids; i++) {
         int status = waitpid(procs[i].pid, NULL, 0);
         if (status == -1) {
-          fprintf(stderr, "Error waiting for child process %d (%s)\n",
-                  procs[i].pid, procs[i].args[0]);
-          // raise_error();
+          // fprintf(stderr, "Error %d (%s)\n", procs[i].pid, procs[i].args[0]);
+          raise_error();
           continue;
         } else {
           /*printf("PID %d exited with status %d\n", pids[i], status);*/
