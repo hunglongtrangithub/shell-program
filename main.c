@@ -11,10 +11,11 @@
 #define WHITE_SPACE " \t\r\n\a"
 #define BUFFER_SIZE 1024 // TODO: is this a reasonable size?
 
-// struct proc {
-//   pid_t pid;
-//   char **args;
-// };
+struct proc {
+  pid_t pid;
+  char **args;
+  int num_args;
+};
 
 char **get_tokens(char *string, int *num_tokens) {
   char **tokens = malloc(BUFFER_SIZE * sizeof(char *));
@@ -45,7 +46,7 @@ char **get_tokens(char *string, int *num_tokens) {
   return tokens;
 }
 
-int search_command_path(char *args[]) {
+int search_command_path(char **args) {
   char *path = strdup(getenv("PATH"));
   if (path == NULL) {
     // fprintf(stderr, "PATH environment variable not set\n");
@@ -113,7 +114,7 @@ int handle_redirect(char **args, int num_args, char **redirect_filename) {
   return 1;
 }
 
-pid_t exec_external_command(char *args[], int num_args) {
+pid_t exec_external_command(char **args, int num_args) {
   char *redirect_filename = NULL;
   if (!handle_redirect(args, num_args, &redirect_filename)) {
     return -1;
@@ -157,6 +158,18 @@ pid_t exec_external_command(char *args[], int num_args) {
   return pid;
 }
 
+pid_t exec_command(char **args, int num_args) {
+  // printf("Executing command: ");
+  // for (int i = 0; i < num_args; i++) {
+  //   printf("%s ", args[i]);
+  // }
+  // printf("\n");
+  if (exec_builtin_command(args, num_args)) {
+    return -1;
+  }
+  return exec_external_command(args, num_args);
+}
+
 int main(int argc, char *argv[]) {
   if (argc > 1) {
     // fprintf(stderr, "Usage: %s\n", argv[0]);
@@ -186,54 +199,80 @@ int main(int argc, char *argv[]) {
     int num_tokens;
     char **tokens = get_tokens(string, &num_tokens);
 
-    int num_pids = 0;
+    int num_procs = 0;
     // TODO: should it be num_tokens / 2?
-    pid_t pids[num_tokens];
-    // struct proc procs[num_tokens];
+    struct proc procs[num_tokens / 2 + 1];
 
     if (tokens != NULL) {
-      int num_args = 0;
-      for (int i = 0; i <= num_tokens; i++) {
-        if (i < num_tokens && strcmp(tokens[i], "&") != 0) {
-          num_args++;
-          continue;
-        }
-        // only reach here if tokens[i] == "&" or i == num_tokens
-        if (num_args == 0) {
-          // fprintf(stderr, "& must be preceded by a command\n");
-          // raise_error();
-          break;
-        }
-        char *args[num_args + 1];
-        for (int j = 0; j < num_args; j++) {
-          args[j] = tokens[i - num_args + j];
-        }
-        args[num_args] = NULL;
+      int valid_command = 1;
+      int arg_start_idx = 0;
+      int arg_end_idx = 0;
 
-        // for (int j = 0; j < num_args; j++) {
-        //   printf("%s ", args[j]);
-        // }
-        // printf("\n");
+      for (arg_end_idx = 0; arg_end_idx < num_tokens; arg_end_idx++) {
+        if (strcmp(tokens[arg_end_idx], "&") == 0) {
+          // printf("Found & at %d\n", arg_end_idx);
+          int num_args = arg_end_idx - arg_start_idx;
 
-        num_args++; // account for NULL terminator
-        if (!exec_builtin_command(args, num_args)) {
-          pid_t pid = exec_external_command(args, num_args);
-          if (pid == -1) {
-            continue;
+          if (num_args == 0) {
+            // fprintf(stderr, "Syntax error: Empty command\n");
+            raise_error();
+            valid_command = 0;
+            break;
           }
-          // printf("PID: %d\n", pid);
-          pids[num_pids] = pid;
-          // procs[num_pids].args = args;
-          // procs[num_pids].pid = pid;
-          num_pids++;
-        }
 
-        // reset for next command
-        num_args = 0;
+          // printf("collecting command\n");
+          char **args = malloc((num_args + 1) * sizeof(char *));
+          for (int i = 0; i < num_args; i++) {
+            args[i] = tokens[arg_start_idx + i];
+          }
+          args[num_args] = NULL;
+
+          procs[num_procs].args = args;
+          procs[num_procs].num_args = num_args + 1;
+          num_procs++;
+
+          arg_start_idx = arg_end_idx + 1;
+        }
+      }
+      // handle the last command
+      if (valid_command && arg_end_idx == num_tokens) {
+        // printf("Found last command\n");
+        int num_args = arg_end_idx - arg_start_idx;
+
+        if (num_args > 0) {
+          // printf("collecting command\n");
+          char **args = malloc((num_args + 1) * sizeof(char *));
+          for (int i = 0; i < num_args; i++) {
+            args[i] = tokens[arg_start_idx + i];
+          }
+          args[num_args] = NULL;
+
+          procs[num_procs].args = args;
+          procs[num_procs].num_args = num_args + 1;
+          num_procs++;
+        }
       }
 
-      for (int i = 0; i < num_pids; i++) {
-        pid_t pid = pids[i];
+      if (!valid_command) {
+        // printf("Invalid command. Freeing args and tokens\n");
+        for (int i = 0; i < num_procs; i++) {
+          free(procs[i].args);
+        }
+        free(tokens);
+        continue;
+      }
+
+      // printf("Num procs: %d\n", num_procs);
+      for (int i = 0; i < num_procs; i++) {
+        pid_t pid = exec_command(procs[i].args, procs[i].num_args);
+        procs[i].pid = pid;
+      }
+
+      for (int i = 0; i < num_procs; i++) {
+        pid_t pid = procs[i].pid;
+        if (pid == -1) {
+          continue;
+        }
         int status = waitpid(pid, NULL, 0);
         if (status == -1) {
           // fprintf(stderr, "Error %d (%s)\n", procs[i].pid, procs[i].args[0]);
@@ -245,8 +284,10 @@ int main(int argc, char *argv[]) {
       }
     }
 
+    for (int i = 0; i < num_procs; i++) {
+      free(procs[i].args);
+    }
     free(tokens);
-    // printf("\n");
   }
 
   if (string != NULL) {
