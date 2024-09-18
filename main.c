@@ -74,13 +74,15 @@ int search_command_path(char *args[]) {
 // TODO: is this the best way?
 int is_path_command(char *command) { return strchr(command, '/') != NULL; }
 
-int handle_redirect(char **args, int num_args) {
+// return 1 if redirection is handled successfully, 0 otherwise
+int handle_redirect(char **args, int num_args, char **redirect_filename) {
   int redirect_index = -1;
   for (int i = 0; i < num_args - 1; i++) {
     if (strcmp(args[i], ">") == 0) {
       if (redirect_index != -1) {
-        // fprintf(stderr, "Syntax error: Multiple redirections.\n");
+        // fprintf(stderr, "Syntax error: Multiple redirections\n");
         raise_error();
+        // exit(1);
         return 0;
       }
       redirect_index = i;
@@ -91,79 +93,67 @@ int handle_redirect(char **args, int num_args) {
     // printf("Redirect index: %d. Num args: %d\n", redirect_index, num_args);
 
     // there must be a filename after '>' and no extra args
-    if (redirect_index == 0 || redirect_index == num_args - 2) {
+    // and the filename must not be the first or last arg
+    if (redirect_index == 0 || redirect_index != num_args - 3) {
       // fprintf(stderr, "Syntax error: Invalid redirection format.\n");
       raise_error();
-      return 0;
-    }
-
-    // open the file for writing (clear content if exists, create if not)
-    // printf("Opening file %s\n", args[redirect_index + 1]);
-    int fd = open(args[redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0) {
-      // fprintf(stderr, "Error opening file %s\n", args[redirect_index + 1]);
-      raise_error();
-      return 0;
       // exit(1);
-    }
-
-    // redirect
-    // printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
-    if (dup2(fd, STDOUT_FILENO) == -1) {
-      // fprintf(stderr, "Error redirecting stdout\n");
-      raise_error();
-      close(fd);
       return 0;
-      // exit(1);
     }
 
-    close(fd);
+    *redirect_filename = args[redirect_index + 1];
 
     // remove all tokens starting from the redirection index
     args[redirect_index] = NULL;
+  } else {
+    *redirect_filename = NULL;
   }
 
   return 1;
 }
 
 pid_t exec_ext_command(char *args[], int num_args) {
-  if (!handle_redirect(args, num_args)) {
+  char *redirect_filename = NULL;
+  if (!handle_redirect(args, num_args, &redirect_filename)) {
     return -1;
   }
-  // if path command --> assume it exists
-  if (is_path_command(args[0])) {
-    pid_t pid = fork();
-    if (pid < 0) {
-      // fprintf(stderr, "Error forking process\n");
-      raise_error();
-      // exit(1);
-    } else if (pid == 0) {
-      if (execv(args[0], args) == -1) {
-        // fprintf(stderr, "Error executing command %s\n", args[0]);
-        raise_error();
-      }
-      exit(1);
-    }
-    return pid;
-  } else if (search_command_path(args)) {
-    pid_t pid = fork();
-    if (pid < 0) {
-      // fprintf(stderr, "Error forking process\n");
-      raise_error();
-      // exit(1);
-    } else if (pid == 0) {
-      if (execvp(args[0], args) == -1) {
-        // fprintf(stderr, "Error executing command %s\n", args[0]);
-        raise_error();
-      }
-      exit(1);
-    }
-    return pid;
-  } else {
-    // fprintf(stderr, "Command not found in PATH\n");
+
+  pid_t pid = fork();
+  if (pid < 0) {
     raise_error();
-    return -1;
+  } else if (pid == 0) {
+    if (redirect_filename != NULL) {
+      // redirect output to file
+      int fd = open(redirect_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd == -1) {
+        raise_error();
+        exit(1);
+      }
+      if (dup2(fd, STDOUT_FILENO) == -1) {
+        raise_error();
+        close(fd);
+        exit(1);
+      }
+      close(fd);
+    }
+
+    if (is_path_command(args[0])) {
+      if (execv(args[0], args) == -1) {
+        fprintf(stderr, "Error: %s\n", args[0]);
+        raise_error();
+      }
+    } else if (search_command_path(args)) {
+      if (execvp(args[0], args) == -1) {
+        fprintf(stderr, "Error: %s\n", args[0]);
+        raise_error();
+      }
+    } else {
+      raise_error();
+    }
+    exit(1);
   }
+
+  return pid;
 }
 
 int main(int argc, char *argv[]) {
