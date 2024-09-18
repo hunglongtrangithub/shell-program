@@ -61,27 +61,23 @@ void search_command_path(char *args[]) {
 // TODO: is this the best way?
 int is_path_command(char *command) { return strchr(command, '/') != NULL; }
 
-void exec_command(char *args[], int num_args) {
-  if (!exec_builtin_command(args, num_args)) {
-    pid_t pid = fork();
-    if (pid < 0) {
-      raise_error();
-      exit(1);
-    } else if (pid == 0) {
-      if (!is_path_command(args[0])) {
-        search_command_path(args);
-      }
-      if (execv(args[0], args) == -1) {
-        perror(args[0]);
-        raise_error();
-      }
-      exit(1);
-    } else {
-      int status;
-      waitpid(pid, &status, 0);
-      // printf("Child process exited with status %d\n", status);
+pid_t exec_ext_command(char *args[], int num_args) {
+  pid_t pid = fork();
+  if (pid < 0) {
+    // printf("Fork failed\n");
+    raise_error();
+    exit(1);
+  } else if (pid == 0) {
+    if (!is_path_command(args[0])) {
+      search_command_path(args);
     }
+    if (execv(args[0], args) == -1) {
+      perror(args[0]);
+      raise_error();
+    }
+    exit(1);
   }
+  return pid;
 }
 
 int main(int argc, char *argv[]) {
@@ -109,6 +105,11 @@ int main(int argc, char *argv[]) {
 
     int num_tokens;
     char **tokens = get_tokens(string, &num_tokens);
+
+    int num_pids = 0;
+    // TODO: should it be num_tokens / 2?
+    pid_t pids[num_tokens];
+
     if (tokens != NULL) {
       int num_args = 0;
       for (int i = 0; i <= num_tokens; i++) {
@@ -133,9 +134,25 @@ int main(int argc, char *argv[]) {
         // }
         // printf("\n");
 
-        exec_command(args, num_args);
+        num_args++;
+        if (!exec_builtin_command(args, num_args)) {
+          pid_t pid = exec_ext_command(args, num_args);
+          // printf("PID: %d\n", pid);
+          pids[num_pids] = pid;
+          num_pids++;
+        }
 
         num_args = 0;
+      }
+
+      for (int i = 0; i < num_pids; i++) {
+        int status = waitpid(pids[i], NULL, 0);
+        if (status == -1) {
+          raise_error();
+          continue;
+        } else {
+          /*printf("PID %d exited with status %d\n", pids[i], status);*/
+        }
       }
     }
 
