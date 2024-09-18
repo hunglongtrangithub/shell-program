@@ -1,8 +1,10 @@
 #include "builtin.h"
 #include "error.h"
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #define WHITE_SPACE " \t\r\n\a"
@@ -61,13 +63,56 @@ void search_command_path(char *args[]) {
 // TODO: is this the best way?
 int is_path_command(char *command) { return strchr(command, '/') != NULL; }
 
+void handle_redirect(char **args, int num_args) {
+  int redirect_index = -1;
+  for (int i = 0; i < num_args - 1; i++) {
+    if (strcmp(args[i], ">") == 0) {
+      redirect_index = i;
+      break;
+    }
+  }
+
+  if (redirect_index != -1) {
+    // printf("Redirect index: %d\n", redirect_index);
+    // printf("Num args: %d\n", num_args);
+
+    // there must be a filename after '>' and no extra args
+    if (redirect_index != num_args - 3) {
+      fprintf(stderr, "Syntax error: Invalid redirection format.\n");
+      raise_error();
+      exit(1);
+    }
+
+    // open the file for writing (truncate if exists, create if not)
+    printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
+    int fd = open(args[redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+      raise_error();
+      exit(1);
+    }
+
+    // Redirect stdout to the file
+    if (dup2(fd, STDOUT_FILENO) == -1) {
+      raise_error();
+      close(fd);
+      exit(1);
+    }
+
+    close(fd);
+
+    // Remove all tokens starting from the redirection index
+    args[redirect_index] = NULL;
+  }
+}
+
 pid_t exec_ext_command(char *args[], int num_args) {
   pid_t pid = fork();
   if (pid < 0) {
-    // printf("Fork failed\n");
+    printf("Fork failed\n");
     raise_error();
     exit(1);
   } else if (pid == 0) {
+    handle_redirect(args, num_args);
     if (!is_path_command(args[0])) {
       search_command_path(args);
     }
@@ -120,7 +165,7 @@ int main(int argc, char *argv[]) {
         // only reach here if tokens[i] == "&" or i == num_tokens
         if (num_args == 0) {
           // printf("& must be preceded by a command\n");
-          raise_error();
+          // raise_error();
           break;
         }
         char *args[num_args + 1];
@@ -134,7 +179,7 @@ int main(int argc, char *argv[]) {
         // }
         // printf("\n");
 
-        num_args++;
+        num_args++; // account for NULL terminator
         if (!exec_builtin_command(args, num_args)) {
           pid_t pid = exec_ext_command(args, num_args);
           // printf("PID: %d\n", pid);
