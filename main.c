@@ -50,7 +50,6 @@ int search_command_path(char *args[]) {
   // printf("%s: %s\n", "PATH", path);
   if (path == NULL) {
     // fprintf(stderr, "PATH environment variable not set\n");
-    raise_error();
     return 0;
   }
   char *path_token = NULL;
@@ -68,7 +67,6 @@ int search_command_path(char *args[]) {
       return 1;
     }
   }
-  raise_error();
   return 0;
   // fprintf(stderr, "Command not found in PATH\n");
 }
@@ -119,29 +117,32 @@ void handle_redirect(char **args, int num_args) {
   }
 }
 
-pid_t exec_ext_command(char *args[], int num_args) {
+pid_t exec_command(char *args[], int num_args) {
   pid_t pid = fork();
   if (pid < 0) {
     // fprintf(stderr, "Error forking process\n");
     raise_error();
     exit(1);
   } else if (pid == 0) {
-    // for (int i = 0; i < num_args; i++) {
-    //   printf("%s ", args[i]);
-    // }
-    // printf("\n");
-    handle_redirect(args, num_args);
-    if (!is_path_command(args[0])) {
-      if (search_command_path(args)) {
-        if (execv(args[0], args) == -1) {
-          // fprintf(stderr, "Error executing command %s\n", args[0]);
-          raise_error();
-        }
-        exit(1);
-      };
+    if (execv(args[0], args) == -1) {
+      // fprintf(stderr, "Error executing command %s\n", args[0]);
+      raise_error();
     }
+    exit(1);
   }
   return pid;
+}
+
+pid_t exec_ext_command(char *args[], int num_args) {
+  handle_redirect(args, num_args);
+  // if path command --> assume it exists
+  int path_found = is_path_command(args[0]) || search_command_path(args);
+  if (!path_found) {
+    // fprintf(stderr, "Command not found\n");
+    raise_error();
+    return -1;
+  }
+  return exec_command(args, num_args);
 }
 
 int main(int argc, char *argv[]) {
@@ -205,6 +206,9 @@ int main(int argc, char *argv[]) {
         num_args++; // account for NULL terminator
         if (!exec_builtin_command(args, num_args)) {
           pid_t pid = exec_ext_command(args, num_args);
+          if (pid == -1) {
+            continue;
+          }
           // printf("PID: %d\n", pid);
           // pids[num_pids] = pid;
           procs[num_pids].args = args;
@@ -223,7 +227,7 @@ int main(int argc, char *argv[]) {
           raise_error();
           continue;
         } else {
-          /*printf("PID %d exited with status %d\n", pids[i], status);*/
+          // printf("PID %d exited with status %d\n", pids[i], status);
         }
       }
     }

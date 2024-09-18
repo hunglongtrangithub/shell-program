@@ -15,6 +15,7 @@ struct builtin_command {
 int builtin_path(char **args, int num_args) {
   if (num_args == 2) {
     // no new paths provided
+    // printf("%s: %s\n", "new PATH", "");
     setenv("PATH", "", 1);
     return 1;
   }
