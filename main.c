@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "builtin.h"
 #include "error.h"
 #include <fcntl.h>
