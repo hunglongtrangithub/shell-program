@@ -11,10 +11,10 @@
 #define WHITE_SPACE " \t\r\n\a"
 #define BUFFER_SIZE 1024 // TODO: is this a reasonable size?
 
-struct proc {
-  pid_t pid;
-  char **args;
-};
+// struct proc {
+//   pid_t pid;
+//   char **args;
+// };
 
 char **get_tokens(char *string, int *num_tokens) {
   char **tokens = malloc(BUFFER_SIZE * sizeof(char *));
@@ -46,14 +46,14 @@ char **get_tokens(char *string, int *num_tokens) {
 }
 
 int search_command_path(char *args[]) {
-  char *path = getenv("PATH");
-  // printf("%s: %s\n", "PATH", path);
+  char *path = strdup(getenv("PATH"));
   if (path == NULL) {
     // fprintf(stderr, "PATH environment variable not set\n");
     return 0;
   }
+  char *path_ptr = path; // to avoid modifying path
   char *path_token = NULL;
-  while ((path_token = strsep(&path, ":")) != NULL) {
+  while ((path_token = strsep(&path_ptr, ":")) != NULL) {
     if (strlen(path_token) == 0) {
       continue;
     }
@@ -67,6 +67,7 @@ int search_command_path(char *args[]) {
       return 1;
     }
   }
+  free(path);
   return 0;
   // fprintf(stderr, "Command not found in PATH\n");
 }
@@ -112,7 +113,7 @@ int handle_redirect(char **args, int num_args, char **redirect_filename) {
   return 1;
 }
 
-pid_t exec_ext_command(char *args[], int num_args) {
+pid_t exec_external_command(char *args[], int num_args) {
   char *redirect_filename = NULL;
   if (!handle_redirect(args, num_args, &redirect_filename)) {
     return -1;
@@ -139,12 +140,12 @@ pid_t exec_ext_command(char *args[], int num_args) {
 
     if (is_path_command(args[0])) {
       if (execv(args[0], args) == -1) {
-        fprintf(stderr, "Error: %s\n", args[0]);
+        // fprintf(stderr, "Error: %s\n", args[0]);
         raise_error();
       }
     } else if (search_command_path(args)) {
       if (execvp(args[0], args) == -1) {
-        fprintf(stderr, "Error: %s\n", args[0]);
+        // fprintf(stderr, "Error: %s\n", args[0]);
         raise_error();
       }
     } else {
@@ -187,8 +188,8 @@ int main(int argc, char *argv[]) {
 
     int num_pids = 0;
     // TODO: should it be num_tokens / 2?
-    // pid_t pids[num_tokens];
-    struct proc procs[num_tokens];
+    pid_t pids[num_tokens];
+    // struct proc procs[num_tokens];
 
     if (tokens != NULL) {
       int num_args = 0;
@@ -216,14 +217,14 @@ int main(int argc, char *argv[]) {
 
         num_args++; // account for NULL terminator
         if (!exec_builtin_command(args, num_args)) {
-          pid_t pid = exec_ext_command(args, num_args);
+          pid_t pid = exec_external_command(args, num_args);
           if (pid == -1) {
             continue;
           }
           // printf("PID: %d\n", pid);
-          // pids[num_pids] = pid;
-          procs[num_pids].args = args;
-          procs[num_pids].pid = pid;
+          pids[num_pids] = pid;
+          // procs[num_pids].args = args;
+          // procs[num_pids].pid = pid;
           num_pids++;
         }
 
@@ -232,7 +233,8 @@ int main(int argc, char *argv[]) {
       }
 
       for (int i = 0; i < num_pids; i++) {
-        int status = waitpid(procs[i].pid, NULL, 0);
+        pid_t pid = pids[i];
+        int status = waitpid(pid, NULL, 0);
         if (status == -1) {
           // fprintf(stderr, "Error %d (%s)\n", procs[i].pid, procs[i].args[0]);
           raise_error();
