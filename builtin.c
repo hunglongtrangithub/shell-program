@@ -28,6 +28,7 @@ int builtin_path(char **args, int num_args) {
     strcat(new_path, ":");
   }
   new_path[len_new_path - 1] = '\0';
+  printf("%s: %s\n", "new PATH", new_path);
   setenv("PATH", new_path, 1);
   return 1;
 }

@@ -13,6 +13,7 @@
 char **get_tokens(char *string, int *num_tokens) {
   char **tokens = malloc(BUFFER_SIZE * sizeof(char *));
   if (tokens == NULL) {
+    // fprintf(stderr, "Input buffer memory allocation failed\n");
     raise_error();
     exit(1);
   }
@@ -37,9 +38,12 @@ char **get_tokens(char *string, int *num_tokens) {
   *num_tokens = index;
   return tokens;
 }
+
 void search_command_path(char *args[]) {
   char *path = getenv("PATH");
+  // printf("%s: %s\n", "PATH", path);
   if (path == NULL) {
+    // fprintf(stderr, "PATH environment variable not set\n");
     raise_error();
     return;
   }
@@ -58,6 +62,7 @@ void search_command_path(char *args[]) {
       return;
     }
   }
+  // fprintf(stderr, "Command not found in PATH\n");
 }
 
 // TODO: is this the best way?
@@ -73,8 +78,7 @@ void handle_redirect(char **args, int num_args) {
   }
 
   if (redirect_index != -1) {
-    // printf("Redirect index: %d\n", redirect_index);
-    // printf("Num args: %d\n", num_args);
+    // printf("Redirect index: %d. Num args: %d\n", redirect_index, num_args);
 
     // there must be a filename after '>' and no extra args
     if (redirect_index != num_args - 3) {
@@ -83,15 +87,15 @@ void handle_redirect(char **args, int num_args) {
       exit(1);
     }
 
-    // open the file for writing (truncate if exists, create if not)
-    printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
+    // open the file for writing (clear content if exists, create if not)
+    // printf("Redirecting stdout to %s\n", args[redirect_index + 1]);
     int fd = open(args[redirect_index + 1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
       raise_error();
       exit(1);
     }
 
-    // Redirect stdout to the file
+    // redirect
     if (dup2(fd, STDOUT_FILENO) == -1) {
       raise_error();
       close(fd);
@@ -100,7 +104,7 @@ void handle_redirect(char **args, int num_args) {
 
     close(fd);
 
-    // Remove all tokens starting from the redirection index
+    // remove all tokens starting from the redirection index
     args[redirect_index] = NULL;
   }
 }
@@ -108,7 +112,7 @@ void handle_redirect(char **args, int num_args) {
 pid_t exec_ext_command(char *args[], int num_args) {
   pid_t pid = fork();
   if (pid < 0) {
-    printf("Fork failed\n");
+    // printf("Fork failed\n");
     raise_error();
     exit(1);
   } else if (pid == 0) {
@@ -164,8 +168,8 @@ int main(int argc, char *argv[]) {
         }
         // only reach here if tokens[i] == "&" or i == num_tokens
         if (num_args == 0) {
-          // printf("& must be preceded by a command\n");
-          // raise_error();
+          // fprintf(stderr, "& must be preceded by a command\n");
+          raise_error();
           break;
         }
         char *args[num_args + 1];
