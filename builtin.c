@@ -13,6 +13,12 @@ struct builtin_command {
 };
 
 int builtin_path(char **args, int num_args) {
+  if (num_args == 2) {
+    // no new paths provided
+    setenv("PATH", "", 1);
+    return 1;
+  }
+
   int len_new_path = 0;
   for (int i = 1; i < num_args - 1; i++) {
     // TODO: should I check if the path exists?
@@ -29,7 +35,7 @@ int builtin_path(char **args, int num_args) {
     strcat(new_path, ":");
   }
   new_path[len_new_path - 1] = '\0';
-  printf("%s: %s\n", "new PATH", new_path);
+  // printf("%s: %s\n", "new PATH", new_path);
   setenv("PATH", new_path, 1);
   return 1;
 }

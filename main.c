@@ -45,13 +45,13 @@ char **get_tokens(char *string, int *num_tokens) {
   return tokens;
 }
 
-void search_command_path(char *args[]) {
+int search_command_path(char *args[]) {
   char *path = getenv("PATH");
-  printf("%s: %s\n", "PATH", path);
+  // printf("%s: %s\n", "PATH", path);
   if (path == NULL) {
     // fprintf(stderr, "PATH environment variable not set\n");
     raise_error();
-    return;
+    return 0;
   }
   char *path_token = NULL;
   while ((path_token = strsep(&path, ":")) != NULL) {
@@ -65,10 +65,11 @@ void search_command_path(char *args[]) {
     if (access(command_path, X_OK) == 0) {
       args[0] = command_path;
       // printf("Found command at %s\n", command_path);
-      return;
+      return 1;
     }
   }
   raise_error();
+  return 0;
   // fprintf(stderr, "Command not found in PATH\n");
 }
 
@@ -125,19 +126,20 @@ pid_t exec_ext_command(char *args[], int num_args) {
     raise_error();
     exit(1);
   } else if (pid == 0) {
-    handle_redirect(args, num_args);
-    // if (!is_path_command(args[0])) {
-    //   search_command_path(args);
-    // }
     // for (int i = 0; i < num_args; i++) {
     //   printf("%s ", args[i]);
     // }
     // printf("\n");
-    if (execvp(args[0], args) == -1) {
-      // fprintf(stderr, "Error executing command %s\n", args[0]);
-      raise_error();
+    handle_redirect(args, num_args);
+    if (!is_path_command(args[0])) {
+      if (search_command_path(args)) {
+        if (execv(args[0], args) == -1) {
+          // fprintf(stderr, "Error executing command %s\n", args[0]);
+          raise_error();
+        }
+        exit(1);
+      };
     }
-    exit(1);
   }
   return pid;
 }
