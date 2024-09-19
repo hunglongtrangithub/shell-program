@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
   ssize_t read_size;
 
   // printf("Welcome to rush shell!\n");
-  setenv("PATH", "/bin", 1);
+  // setenv("PATH", "/bin", 1);
 
   while (1) {
     printf("%s> ", shell_name);
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     read_size = getline(&string, &buffer_size, stdin);
     if (read_size == -1) {
       // fprintf(stderr, "Error reading input\n");
-      raise_error();
+      // raise_error();
       break;
     }
 

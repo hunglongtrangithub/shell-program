@@ -17,6 +17,7 @@ struct builtin_command {
   builtin_func func;
 };
 
+// TODO: overwrite or add new paths to PATH?
 int builtin_path(char **args, int num_args) {
   if (num_args == 2) {
     // no new paths provided
@@ -25,14 +26,20 @@ int builtin_path(char **args, int num_args) {
     return 1;
   }
 
+  char *path = getenv("PATH");
+  if (path == NULL) {
+    // fprintf(stderr, "PATH environment variable not set\n");
+    return 0;
+  }
+  char *path_copy = strdup(path); // avoid modifying the original path
+
   int len_new_path = 0;
   for (int i = 1; i < num_args - 1; i++) {
-    // TODO: should I check if the path exists?
-    // +1 for colon or null terminator for the last arg
+    // +1 for colon or null terminator
     len_new_path += strlen(args[i]) + 1;
   }
 
-  char new_path[len_new_path];
+  char new_path[len_new_path + strlen(path_copy)];
 
   // set length of new_path to 0
   new_path[0] = '\0';
@@ -40,9 +47,11 @@ int builtin_path(char **args, int num_args) {
     strcat(new_path, args[i]);
     strcat(new_path, ":");
   }
-  new_path[len_new_path - 1] = '\0';
+  strcat(new_path, path_copy); // add the original path
+  new_path[len_new_path + strlen(path_copy)] = '\0';
   // printf("%s: %s\n", "new PATH", new_path);
   setenv("PATH", new_path, 1);
+  free(path_copy);
   return 1;
 }
 
@@ -67,6 +76,7 @@ const struct builtin_command builtins[] = {
     {"cd", builtin_cd}, {"exit", builtin_exit}, {"path", builtin_path}};
 int num_builtins() { return sizeof(builtins) / sizeof(struct builtin_command); }
 
+// return flag of whether the command is a builtin command
 int exec_builtin_command(char *args[], int num_args) {
   if (args[0] == NULL) {
     return 1;
