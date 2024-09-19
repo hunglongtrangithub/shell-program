@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #define WHITE_SPACE " \t\r\n\a"
-#define BUFFER_SIZE 255
 
 struct proc {
   pid_t pid;

@@ -1,3 +1,5 @@
+// bunch of functions dealing with NULL-terminated array of string arguments
+// all of the strings are heap-allocated
 #define _GNU_SOURCE
 #include "error.h"
 #include <fcntl.h>
@@ -5,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#define BUFFER_SIZE 255
 
 const char *builtin_commands[] = {"cd", "exit", "path"};
 typedef int (*builtin_func)(char **args, int num_args);
@@ -78,29 +82,28 @@ int exec_builtin_command(char *args[], int num_args) {
   return 0;
 }
 
-int search_command_path(char **args) {
-  char *path = strdup(getenv("PATH"));
+int search_command_path(char *cmd_name, char *cmd_path) {
+  char *path = (getenv("PATH"));
   if (path == NULL) {
     // fprintf(stderr, "PATH environment variable not set\n");
     return 0;
   }
-  char *path_ptr = path; // to avoid modifying path
+  char *path_copy = strdup(path); // avoid modifying the original path
+  char *path_ptr = path_copy;
   char *path_token = NULL;
   while ((path_token = strsep(&path_ptr, ":")) != NULL) {
     if (strlen(path_token) == 0) {
       continue;
     }
-    char command_path[strlen(path_token) + strlen(args[0]) + 2];
-    strcpy(command_path, path_token);
-    strcat(command_path, "/");
-    strcat(command_path, args[0]);
-    if (access(command_path, X_OK) == 0) {
-      // args[0] = command_path;
+    // char command_path[strlen(path_token) + strlen(cmd_name) + 2];
+    sprintf(cmd_path, "%s/%s", path_token, cmd_name);
+    if (access(cmd_path, X_OK) == 0) {
       // printf("Found command at %s\n", command_path);
+      free(path_copy);
       return 1;
     }
   }
-  free(path);
+  free(path_copy);
   return 0;
   // fprintf(stderr, "Command not found in PATH\n");
 }
@@ -171,20 +174,19 @@ pid_t exec_external_command(char **args, int num_args) {
       close(fd);
     }
 
-    if (is_path_command(args[0])) {
-      if (execv(args[0], args) == -1) {
-        // fprintf(stderr, "Error: %s\n", args[0]);
-        // raise_error();
-      }
-    } else if (search_command_path(args)) {
-      if (execvp(args[0], args) == -1) {
-        // fprintf(stderr, "Error: %s\n", args[0]);
-        // raise_error();
-      }
-    } else {
-      // command not found
+    // Always search PATH for the command
+    char full_path[BUFFER_SIZE];
+    if (!search_command_path(args[0], full_path)) {
       raise_error();
+      exit(1);
     }
+
+    // Execute the command using execv
+    if (execv(full_path, args) == -1) {
+      // Execution failed
+      // exit(1);
+    }
+
     exit(1);
   }
 
