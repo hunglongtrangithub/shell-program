@@ -1,5 +1,6 @@
-// bunch of functions dealing with NULL-terminated array of string arguments
-// all of the strings are heap-allocated
+// Name: Hung Tran NetID: U00526311
+// Desc: bunch of functions dealing with NULL-terminated array of string
+// arguments. All of the strings are heap-allocated
 #define _GNU_SOURCE
 #include "error.h"
 #include <fcntl.h>

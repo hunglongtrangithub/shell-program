@@ -1,3 +1,5 @@
+// Name: Hung Tran NetID: U00526311
+// Desc: main shell logic & input string parsing logic
 #define _GNU_SOURCE
 #include "command.h"
 #include "error.h"

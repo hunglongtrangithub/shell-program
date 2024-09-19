@@ -1,3 +1,5 @@
+// Name: Hung Tran NetID: U00526311
+// Desc: define a function to write an error message to stderr
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
