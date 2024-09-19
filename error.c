@@ -3,7 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 
-const char error_message[] = "An error has occurred\n";
+const char error_message[30] = "An error has occurred\n";
 void raise_error() {
   write(STDERR_FILENO, error_message, strlen(error_message));
   fflush(stderr);
