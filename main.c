@@ -86,6 +86,12 @@ int main(int argc, char *argv[]) {
 
       for (arg_end_idx = 0; arg_end_idx < num_tokens; arg_end_idx++) {
         if (strcmp(tokens[arg_end_idx], "&") == 0) {
+          // silence error message when & is the only token
+          if (arg_end_idx == 0 && num_tokens == 1) {
+            // fprintf(stderr, "Syntax error: Empty command\n");
+            valid_command = 0;
+            break;
+          }
           // printf("Found & at %d\n", arg_end_idx);
           int num_args = arg_end_idx - arg_start_idx;
 
