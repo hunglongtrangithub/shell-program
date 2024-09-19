@@ -22,6 +22,7 @@ int get_tokens(char *string, char **tokens) {
   int num_tokens = 0;
   char *token = NULL;
   while ((token = strsep(&string, WHITE_SPACE)) != NULL) {
+    // when there are consecutive white spaces
     if (strlen(token) == 0) {
       continue;
     }
@@ -44,8 +45,8 @@ int main(int argc, char *argv[]) {
   size_t buffer_size = 0;
   ssize_t read_size;
 
-  // printf("Welcome to rush shell!\n");
-  // setenv("PATH", "/bin", 1);
+  // set PATH to have only /bin
+  setenv("PATH", "/bin", 1);
 
   while (1) {
     printf("%s> ", shell_name);
@@ -54,20 +55,21 @@ int main(int argc, char *argv[]) {
     read_size = getline(&string, &buffer_size, stdin);
     if (read_size == -1) {
       // fprintf(stderr, "Error reading input\n");
-      // raise_error();
+      raise_error();
       break;
     }
 
     int num_tokens = get_tokens(string, tokens);
+    // skip empty commands
     if (num_tokens == 0) {
       continue;
     }
 
     int num_procs = 0;
-    // TODO: should it be num_tokens / 2?
+    // take num_tokens as the upper bound for the number of processes
     struct proc procs[num_tokens];
 
-    int valid_command = 1;
+    int valid_command = 1; // flag to check if the command has syntax error
     int arg_start_idx = 0;
     int arg_end_idx = 0;
 
@@ -90,6 +92,7 @@ int main(int argc, char *argv[]) {
         }
 
         // printf("collecting command\n");
+        // account for NULL at the end
         char **args = malloc((num_args + 1) * sizeof(char *));
         for (int i = 0; i < num_args; i++) {
           args[i] = tokens[arg_start_idx + i];
@@ -123,7 +126,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (!valid_command) {
-      // printf("Invalid command. Freeing args and tokens\n");
+      // don't execute any commands if there's a syntax error
+      // free heap memory
       for (int i = 0; i < num_procs; i++) {
         free(procs[i].args);
       }
@@ -131,24 +135,28 @@ int main(int argc, char *argv[]) {
     }
 
     // printf("Num procs: %d\n", num_procs);
+    // spawn processes
     for (int i = 0; i < num_procs; i++) {
       pid_t pid = exec_command(procs[i].args, procs[i].num_args);
       procs[i].pid = pid;
     }
-
+    // wait for all processes to finish
     for (int i = 0; i < num_procs; i++) {
       pid_t pid = procs[i].pid;
+      // skip built-in commands
       if (pid == -1) {
         continue;
       }
       waitpid(pid, NULL, 0);
     }
 
+    // free heap memory
     for (int i = 0; i < num_procs; i++) {
       free(procs[i].args);
     }
   }
 
+  // free heap memory if getline fails
   if (string != NULL) {
     free(string);
   }
