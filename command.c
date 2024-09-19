@@ -115,7 +115,6 @@ int handle_redirect(char **args, int num_args, char **redirect_filename) {
     if (strcmp(args[i], ">") == 0) {
       if (redirect_index != -1) {
         // fprintf(stderr, "Syntax error: Multiple redirections\n");
-        raise_error();
         // exit(1);
         return 0;
       }
@@ -130,7 +129,6 @@ int handle_redirect(char **args, int num_args, char **redirect_filename) {
     // and the filename must not be the first or last arg
     if (redirect_index == 0 || redirect_index != num_args - 3) {
       // fprintf(stderr, "Syntax error: Invalid redirection format.\n");
-      raise_error();
       // exit(1);
       return 0;
     }
@@ -149,22 +147,24 @@ int handle_redirect(char **args, int num_args, char **redirect_filename) {
 pid_t exec_external_command(char **args, int num_args) {
   char *redirect_filename = NULL;
   if (!handle_redirect(args, num_args, &redirect_filename)) {
+    raise_error();
     return -1;
   }
 
   pid_t pid = fork();
   if (pid < 0) {
-    raise_error();
+    // raise_error();
+    exit(1);
   } else if (pid == 0) {
     if (redirect_filename != NULL) {
       // redirect output to file
       int fd = open(redirect_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
       if (fd == -1) {
-        raise_error();
+        // raise_error();
         exit(1);
       }
       if (dup2(fd, STDOUT_FILENO) == -1) {
-        raise_error();
+        // raise_error();
         close(fd);
         exit(1);
       }
@@ -174,14 +174,15 @@ pid_t exec_external_command(char **args, int num_args) {
     if (is_path_command(args[0])) {
       if (execv(args[0], args) == -1) {
         // fprintf(stderr, "Error: %s\n", args[0]);
-        raise_error();
+        // raise_error();
       }
     } else if (search_command_path(args)) {
       if (execvp(args[0], args) == -1) {
         // fprintf(stderr, "Error: %s\n", args[0]);
-        raise_error();
+        // raise_error();
       }
     } else {
+      // command not found
       raise_error();
     }
     exit(1);
