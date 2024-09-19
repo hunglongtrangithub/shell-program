@@ -153,18 +153,18 @@ pid_t exec_external_command(char **args, int num_args) {
 
   pid_t pid = fork();
   if (pid < 0) {
-    // raise_error();
+    raise_error();
     exit(1);
   } else if (pid == 0) {
     if (redirect_filename != NULL) {
       // redirect output to file
       int fd = open(redirect_filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
       if (fd == -1) {
-        // raise_error();
+        raise_error();
         exit(1);
       }
       if (dup2(fd, STDOUT_FILENO) == -1) {
-        // raise_error();
+        raise_error();
         close(fd);
         exit(1);
       }
