@@ -44,19 +44,17 @@ int builtin_path(char **args, int num_args) {
 
 int builtin_exit(char **args, int num_args) {
   if (num_args != 2) {
-    raise_error();
-    return 1;
+    return 0;
   }
   exit(0);
 }
 
 int builtin_cd(char **args, int num_args) {
   if (num_args != 3) {
-    raise_error();
-    return 1;
+    return 0;
   }
   if (chdir(args[1]) != 0) {
-    raise_error();
+    return 0;
   }
   return 1;
 }
@@ -71,7 +69,10 @@ int exec_builtin_command(char *args[], int num_args) {
   }
   for (int i = 0; i < num_builtins(); i++) {
     if (strcmp(args[0], builtins[i].name) == 0) {
-      return builtins[i].func(args, num_args);
+      if (!builtins[i].func(args, num_args)) {
+        raise_error();
+      }
+      return 1;
     }
   }
   return 0;
