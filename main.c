@@ -110,11 +110,6 @@ int main(int argc, char *argv[]) {
           arg_start_idx = arg_end_idx + 1;
         }
       }
-      // handle when & is at the end
-      if (valid_command && strcmp(tokens[num_tokens - 1], "&") == 0) {
-        raise_error();
-        valid_command = 0;
-      }
       // handle the last command
       if (valid_command && arg_end_idx == num_tokens) {
         // printf("Found last command\n");
