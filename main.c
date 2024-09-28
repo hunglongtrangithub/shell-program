@@ -81,7 +81,6 @@ int main(int argc, char *argv[]) {
           valid_command = 0;
           break;
         }
-        // printf("Found & at %d\n", arg_end_idx);
         int num_args = arg_end_idx - arg_start_idx;
 
         if (num_args == 0) {
@@ -91,7 +90,6 @@ int main(int argc, char *argv[]) {
           break;
         }
 
-        // printf("collecting command\n");
         // account for NULL at the end
         char **args = malloc((num_args + 1) * sizeof(char *));
         for (int i = 0; i < num_args; i++) {
@@ -108,11 +106,9 @@ int main(int argc, char *argv[]) {
     }
     // handle the last command
     if (valid_command && arg_end_idx == num_tokens) {
-      // printf("Found last command\n");
       int num_args = arg_end_idx - arg_start_idx;
 
       if (num_args > 0) {
-        // printf("collecting command\n");
         char **args = malloc((num_args + 1) * sizeof(char *));
         for (int i = 0; i < num_args; i++) {
           args[i] = tokens[arg_start_idx + i];
@@ -134,7 +130,6 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    // printf("Num procs: %d\n", num_procs);
     // spawn processes
     for (int i = 0; i < num_procs; i++) {
       pid_t pid = exec_command(procs[i].args, procs[i].num_args);
